@@ -1,1 +1,1 @@
-https://your-app-name.onrender.com
+https://battleship-server-18q1.onrender.com
