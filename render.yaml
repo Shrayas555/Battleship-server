@@ -1,0 +1,13 @@
+# Optional: Render Blueprint for one-click deploy
+# Add a Postgres DB in dashboard and link DATABASE_URL to the web service
+services:
+  - type: web
+    name: battleship-server
+    env: node
+    buildCommand: npm install
+    startCommand: npm run migrate && npm start
+    envVars:
+      - key: TEST_MODE
+        value: "true"
+      - key: TEST_PASSWORD
+        value: clemson-test-2026
