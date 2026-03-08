@@ -2,20 +2,22 @@ const express = require('express');
 const router = express.Router();
 const { createPlayer, getPlayerById, getPlayerByDisplayName, isValidUUID } = require('../db/queries.js');
 
-// POST /api/players — body: { username }. Reject if client sends player_id → 400.
+// POST /api/players — body: { username } or { playerName }. Reject if client sends player_id → 400.
 router.post('/', async (req, res) => {
   try {
-    const { username, player_id: clientPlayerId } = req.body || {};
+    const body = req.body || {};
+    const { player_id: clientPlayerId } = body;
     if (clientPlayerId !== undefined && clientPlayerId !== null) {
       return res.status(400).json({ error: 'Client may not supply player_id' });
     }
-    if (!username || typeof username !== 'string' || !username.trim()) {
+    const username = body.username ?? body.playerName;
+    if (!username || typeof username !== 'string' || !String(username).trim()) {
       return res.status(400).json({ error: 'username required' });
     }
-    const displayName = username.trim();
+    const displayName = String(username).trim();
     const existing = await getPlayerByDisplayName(displayName);
     if (existing) {
-      return res.status(201).json({ player_id: existing.id });
+      return res.status(400).json({ error: 'Username already exists' });
     }
     const id = await createPlayer(displayName);
     return res.status(201).json({ player_id: id });

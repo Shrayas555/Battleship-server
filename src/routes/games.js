@@ -15,7 +15,7 @@ const {
   allPlayersPlaced,
   executeFireInTransaction,
 } = require('../db/queries.js');
-const { getPlayerById } = require('../db/queries.js');
+const { getPlayerById, isValidUUID } = require('../db/queries.js');
 
 // POST /api/games — body: creator_id, grid_size, max_players
 router.post('/', async (req, res) => {
@@ -34,6 +34,7 @@ router.post('/', async (req, res) => {
       grid_size: game.grid_size,
       max_players: game.max_players,
       status: game.status,
+      game_status: game.status,
     });
   } catch (err) {
     console.error(err);
@@ -45,6 +46,7 @@ router.post('/', async (req, res) => {
 router.post('/:id/join', async (req, res) => {
   try {
     const gameId = req.params.id;
+    if (!isValidUUID(gameId)) return res.status(404).json({ error: 'Game not found' });
     const { player_id: playerId } = req.body || {};
     if (!playerId) return res.status(400).json({ error: 'player_id required' });
     const game = await getGameById(gameId);
@@ -74,9 +76,12 @@ router.get('/:id', async (req, res) => {
     return res.json({
       game_id: game.id,
       grid_size: game.grid_size,
+      max_players: game.max_players,
       status: game.status,
+      game_status: game.status,
       current_turn_index: game.current_turn_index,
       active_players: activeCount,
+      player_ids: gamePlayers.map((gp) => gp.player_id),
     });
   } catch (err) {
     console.error(err);
@@ -84,11 +89,13 @@ router.get('/:id', async (req, res) => {
   }
 });
 
-// POST /api/games/:id/place — body: player_id, ships: [ { row, col }, ... ]
+// POST /api/games/:id/place — body: player_id or playerId, ships: [ { row, col }, ... ]
 router.post('/:id/place', async (req, res) => {
   try {
     const gameId = req.params.id;
-    const { player_id: playerId, ships: shipsBody } = req.body || {};
+    const body = req.body || {};
+    const playerId = body.player_id ?? body.playerId;
+    const shipsBody = body.ships;
     if (!playerId) return res.status(400).json({ error: 'player_id required' });
     const game = await getGameById(gameId);
     if (!game) return res.status(404).json({ error: 'Game not found' });
@@ -117,7 +124,7 @@ router.post('/:id/place', async (req, res) => {
     if (await allPlayersPlaced(gameId)) {
       await setGameStatus(gameId, 'active');
     }
-    return res.status(200).json({ placed: true });
+    return res.status(201).json({ placed: true });
   } catch (err) {
     console.error(err);
     return res.status(500).json({ error: 'Internal server error' });
