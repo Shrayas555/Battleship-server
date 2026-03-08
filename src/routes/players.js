@@ -13,10 +13,9 @@ router.post('/', async (req, res) => {
       return res.status(400).json({ error: 'username required' });
     }
     const displayName = username.trim();
-    // Reuse existing player by display_name (globally unique)
-    let player = await getPlayerByDisplayName(displayName);
-    if (player) {
-      return res.status(201).json({ player_id: player.id });
+    const existing = await getPlayerByDisplayName(displayName);
+    if (existing) {
+      return res.status(400).json({ error: 'Username already exists' });
     }
     const id = await createPlayer(displayName);
     return res.status(201).json({ player_id: id });
@@ -31,7 +30,7 @@ router.post('/', async (req, res) => {
 router.get('/:id/stats', async (req, res) => {
   try {
     const id = req.params.id;
-    if (!isValidUUID(id)) return res.status(400).json({ error: 'Invalid player id' });
+    if (!isValidUUID(id)) return res.status(404).json({ error: 'Player not found' });
     const player = await getPlayerById(id);
     if (!player) return res.status(404).json({ error: 'Player not found' });
     const totalShots = Number(player.total_shots) || 0;

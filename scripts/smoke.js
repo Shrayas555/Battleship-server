@@ -61,14 +61,14 @@ async function run() {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ player_id: p1Id, ships }),
   });
-  if (res.status !== 200) fail('POST /api/games/:id/place p1', res);
+  if (res.status !== 200 && res.status !== 201) fail('POST /api/games/:id/place p1', res);
 
   res = await fetch(`${base}/api/games/${gameId}/place`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ player_id: p2Id, ships: [{ row: 5, col: 5 }, { row: 5, col: 6 }, { row: 5, col: 7 }] }),
   });
-  if (res.status !== 200) fail('POST /api/games/:id/place p2', res);
+  if (res.status !== 200 && res.status !== 201) fail('POST /api/games/:id/place p2', res);
 
   res = await fetch(`${base}/api/games/${gameId}/fire`, {
     method: 'POST',

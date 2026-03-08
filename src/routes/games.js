@@ -74,9 +74,11 @@ router.get('/:id', async (req, res) => {
     return res.json({
       game_id: game.id,
       grid_size: game.grid_size,
+      max_players: game.max_players,
       status: game.status,
       current_turn_index: game.current_turn_index,
       active_players: activeCount,
+      player_ids: gamePlayers.map((gp) => gp.player_id),
     });
   } catch (err) {
     console.error(err);
@@ -117,7 +119,7 @@ router.post('/:id/place', async (req, res) => {
     if (await allPlayersPlaced(gameId)) {
       await setGameStatus(gameId, 'active');
     }
-    return res.status(200).json({ placed: true });
+    return res.status(201).json({ placed: true });
   } catch (err) {
     console.error(err);
     return res.status(500).json({ error: 'Internal server error' });

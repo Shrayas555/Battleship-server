@@ -10,7 +10,7 @@ const { testModeAuth } = require('../middleware/testMode.js');
 router.post('/reset', async (req, res) => {
   try {
     await resetNonPlayerData();
-    return res.json({ status: 'reset' });
+    return res.status(200).json({ status: 'reset' });
   } catch (err) {
     console.error(err);
     return res.status(500).json({ error: 'Internal server error' });
