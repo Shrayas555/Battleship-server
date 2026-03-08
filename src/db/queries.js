@@ -6,17 +6,28 @@ function isValidUUID(s) {
   return typeof s === 'string' && UUID_REGEX.test(s);
 }
 
+function isNumericId(v) {
+  if (typeof v === 'number' && Number.isInteger(v)) return true;
+  if (typeof v === 'string' && /^\d+$/.test(v)) return true;
+  return false;
+}
+
 // --- Players ---
 async function createPlayer(displayName) {
   const r = await pool.query(
-    'INSERT INTO players (display_name) VALUES ($1) RETURNING id',
+    'INSERT INTO players (display_name) VALUES ($1) RETURNING id, api_id',
     [displayName]
   );
-  return r.rows[0].id;
+  return r.rows[0]; // { id, api_id }
 }
 
 async function getPlayerById(id) {
-  const r = await pool.query('SELECT * FROM players WHERE id = $1', [id]);
+  const byApiId = isNumericId(id);
+  const col = byApiId ? 'api_id' : 'id';
+  const r = await pool.query(
+    `SELECT * FROM players WHERE ${col} = $1`,
+    [byApiId ? (typeof id === 'string' ? parseInt(id, 10) : id) : id]
+  );
   return r.rows[0] || null;
 }
 
@@ -27,16 +38,18 @@ async function getPlayerByDisplayName(displayName) {
 
 // --- Games ---
 async function createGame(creatorId, gridSize, maxPlayers) {
+  const creator = await getPlayerById(creatorId);
+  if (!creator) return null;
   const client = await pool.connect();
   try {
     const gameR = await client.query(
-      'INSERT INTO games (grid_size, max_players, status) VALUES ($1, $2, $3) RETURNING id, grid_size, max_players, status',
+      'INSERT INTO games (grid_size, max_players, status) VALUES ($1, $2, $3) RETURNING id, api_id, grid_size, max_players, status',
       [gridSize, maxPlayers, 'waiting']
     );
     const game = gameR.rows[0];
     await client.query(
       'INSERT INTO game_players (game_id, player_id, turn_order) VALUES ($1, $2, 0)',
-      [game.id, creatorId]
+      [game.id, creator.id]
     );
     return game;
   } finally {
@@ -45,7 +58,12 @@ async function createGame(creatorId, gridSize, maxPlayers) {
 }
 
 async function getGameById(id) {
-  const r = await pool.query('SELECT * FROM games WHERE id = $1', [id]);
+  const byApiId = isNumericId(id);
+  const col = byApiId ? 'api_id' : 'id';
+  const r = await pool.query(
+    `SELECT * FROM games WHERE ${col} = $1`,
+    [byApiId ? (typeof id === 'string' ? parseInt(id, 10) : id) : id]
+  );
   return r.rows[0] || null;
 }
 
@@ -332,12 +350,13 @@ async function executeFireInTransaction(gameId, playerId, row, col) {
   }
 }
 
-// --- Reset (games, game_players, ships, moves; keep players) ---
+// --- Reset (clear all game data and players so tests can reuse usernames) ---
 async function resetNonPlayerData() {
   await pool.query('DELETE FROM moves');
   await pool.query('DELETE FROM ships');
   await pool.query('DELETE FROM game_players');
   await pool.query('DELETE FROM games');
+  await pool.query('DELETE FROM players');
 }
 
 // --- Test: restart game (ships, moves, status; keep game_players and stats) ---

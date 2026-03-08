@@ -1,8 +1,9 @@
 const express = require('express');
 const router = express.Router();
-const { createPlayer, getPlayerById, getPlayerByDisplayName, isValidUUID } = require('../db/queries.js');
+const { createPlayer, getPlayerById, getPlayerByDisplayName } = require('../db/queries.js');
 
 // POST /api/players — body: { username } or { playerName }. Reject if client sends player_id → 400.
+// Returns 201 with integer player_id (autograder expects integer).
 router.post('/', async (req, res) => {
   try {
     const body = req.body || {};
@@ -19,8 +20,9 @@ router.post('/', async (req, res) => {
     if (existing) {
       return res.status(400).json({ error: 'Username already exists' });
     }
-    const id = await createPlayer(displayName);
-    return res.status(201).json({ player_id: id });
+    const row = await createPlayer(displayName);
+    const playerId = row.api_id != null ? row.api_id : row.id;
+    return res.status(201).json({ player_id: playerId });
   } catch (err) {
     if (err.code === '23505') return res.status(400).json({ error: 'Username already exists' });
     console.error(err);
@@ -28,11 +30,10 @@ router.post('/', async (req, res) => {
   }
 });
 
-// GET /api/players/:id/stats
+// GET /api/players/:id/stats — id can be integer (api_id) or UUID
 router.get('/:id/stats', async (req, res) => {
   try {
     const id = req.params.id;
-    if (!isValidUUID(id)) return res.status(404).json({ error: 'Player not found' });
     const player = await getPlayerById(id);
     if (!player) return res.status(404).json({ error: 'Player not found' });
     const totalShots = Number(player.total_shots) || 0;

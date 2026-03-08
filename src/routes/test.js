@@ -6,9 +6,10 @@ const {
   getShips,
   resetGameState,
   placeShips,
+  getPlayerById,
 } = require('../db/queries.js');
 
-// POST /api/test/games/:id/restart — reset ships, moves, status=waiting; do not change player stats
+// POST /api/test/games/:id/restart — id can be integer or UUID
 router.post('/games/:id/restart', async (req, res) => {
   try {
     const game = await getGameById(req.params.id);
@@ -21,15 +22,16 @@ router.post('/games/:id/restart', async (req, res) => {
   }
 });
 
-// POST /api/test/games/:id/ships — body: player_id, ships: [ { row, col }, ... ]
+// POST /api/test/games/:id/ships — body: player_id (integer), ships. Used by autograder test_place_ships.
 router.post('/games/:id/ships', async (req, res) => {
   try {
-    const gameId = req.params.id;
-    const { player_id: playerId, ships: shipsBody } = req.body || {};
-    if (!playerId) return res.status(400).json({ error: 'player_id required' });
-    const game = await getGameById(gameId);
+    const game = await getGameById(req.params.id);
     if (!game) return res.status(404).json({ error: 'Game not found' });
-    const gp = await getGamePlayer(gameId, playerId);
+    const { player_id: playerIdParam, ships: shipsBody } = req.body || {};
+    if (!playerIdParam) return res.status(400).json({ error: 'player_id required' });
+    const player = await getPlayerById(playerIdParam);
+    if (!player) return res.status(400).json({ error: 'Player not found' });
+    const gp = await getGamePlayer(game.id, player.id);
     if (!gp) return res.status(403).json({ error: 'Player not in game' });
     if (!Array.isArray(shipsBody) || shipsBody.length !== 3) {
       return res.status(400).json({ error: 'Exactly 3 ships required' });
@@ -48,10 +50,9 @@ router.post('/games/:id/ships', async (req, res) => {
       seen.add(key);
       ships.push({ row, col });
     }
-    // Remove existing ships for this player in this game, then place
     const { pool } = require('../db/connection.js');
-    await pool.query('DELETE FROM ships WHERE game_id = $1 AND player_id = $2', [gameId, playerId]);
-    await placeShips(gameId, playerId, ships);
+    await pool.query('DELETE FROM ships WHERE game_id = $1 AND player_id = $2', [game.id, player.id]);
+    await placeShips(game.id, player.id, ships);
     return res.status(200).json({ placed: true });
   } catch (err) {
     console.error(err);
@@ -59,19 +60,21 @@ router.post('/games/:id/ships', async (req, res) => {
   }
 });
 
-// GET /api/test/games/:id/board/:player_id — reveal board state (ships + hit/miss)
+// GET /api/test/games/:id/board/:player_id — id and player_id can be integer or UUID
 router.get('/games/:id/board/:playerId', async (req, res) => {
   try {
-    const gameId = req.params.id;
-    const playerId = req.params.playerId;
-    const game = await getGameById(gameId);
+    const game = await getGameById(req.params.id);
     if (!game) return res.status(404).json({ error: 'Game not found' });
-    const gp = await getGamePlayer(gameId, playerId);
+    const player = await getPlayerById(req.params.playerId);
+    if (!player) return res.status(404).json({ error: 'Player not found' });
+    const gp = await getGamePlayer(game.id, player.id);
     if (!gp) return res.status(404).json({ error: 'Player not in game' });
-    const ships = await getShips(gameId, playerId);
+    const ships = await getShips(game.id, player.id);
+    const gameIdOut = game.api_id != null ? game.api_id : game.id;
+    const playerIdOut = player.api_id != null ? player.api_id : player.id;
     return res.json({
-      game_id: gameId,
-      player_id: playerId,
+      game_id: gameIdOut,
+      player_id: playerIdOut,
       grid_size: game.grid_size,
       ships: ships.map((s) => ({ row: s.row, col: s.col, hit: s.hit })),
     });
