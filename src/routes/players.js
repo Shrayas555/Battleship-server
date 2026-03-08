@@ -15,7 +15,7 @@ router.post('/', async (req, res) => {
     const displayName = username.trim();
     const existing = await getPlayerByDisplayName(displayName);
     if (existing) {
-      return res.status(400).json({ error: 'Username already exists' });
+      return res.status(201).json({ player_id: existing.id });
     }
     const id = await createPlayer(displayName);
     return res.status(201).json({ player_id: id });
