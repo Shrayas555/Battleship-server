@@ -155,7 +155,16 @@ router.post('/:id/fire', async (req, res) => {
     if (!out.ok) {
       return res.status(out.status).json({ error: out.error });
     }
-    return res.status(200).json(out.result);
+    const body = { ...out.result };
+    if (body.next_player_id != null) {
+      const np = await getPlayerById(body.next_player_id);
+      if (np && np.api_id != null) body.next_player_id = np.api_id;
+    }
+    if (body.winner_id != null) {
+      const w = await getPlayerById(body.winner_id);
+      if (w && w.api_id != null) body.winner_id = w.api_id;
+    }
+    return res.status(200).json(body);
   } catch (err) {
     console.error(err);
     return res.status(500).json({ error: 'Internal server error' });

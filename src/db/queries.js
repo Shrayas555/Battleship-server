@@ -226,8 +226,18 @@ async function executeFireInTransaction(gameId, playerId, row, col) {
       return { ok: false, status: 404, error: 'Game not found' };
     }
     if (game.status !== 'active') {
-      await client.query('ROLLBACK');
-      return { ok: false, status: 403, error: 'Game not active' };
+      if (game.status === 'waiting') {
+        const everyonePlaced = await allPlayersPlaced(gameId);
+        if (!everyonePlaced) {
+          await client.query('ROLLBACK');
+          return { ok: false, status: 400, error: 'Placement not complete' };
+        }
+        await client.query('UPDATE games SET status = $1 WHERE id = $2', ['active', gameId]);
+        game.status = 'active';
+      } else {
+        await client.query('ROLLBACK');
+        return { ok: false, status: 403, error: 'Game not active' };
+      }
     }
 
     const gpRow = await client.query(
@@ -235,7 +245,7 @@ async function executeFireInTransaction(gameId, playerId, row, col) {
       [gameId]
     );
     const gamePlayers = gpRow.rows;
-    const gp = gamePlayers.find((p) => p.player_id === playerId);
+    const gp = gamePlayers.find((p) => String(p.player_id) === String(playerId));
     if (!gp) {
       await client.query('ROLLBACK');
       return { ok: false, status: 403, error: 'Player not in game' };
@@ -246,7 +256,7 @@ async function executeFireInTransaction(gameId, playerId, row, col) {
     }
 
     const currentId = getCurrentPlayerId(game, gamePlayers);
-    if (currentId !== playerId) {
+    if (String(currentId) !== String(playerId)) {
       await client.query('ROLLBACK');
       return { ok: false, status: 403, error: 'Not your turn' };
     }

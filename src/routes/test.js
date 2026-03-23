@@ -7,6 +7,8 @@ const {
   resetGameState,
   placeShips,
   getPlayerById,
+  allPlayersPlaced,
+  setGameStatus,
 } = require('../db/queries.js');
 
 // POST /api/test/games/:id/restart — id can be integer or UUID
@@ -53,6 +55,10 @@ router.post('/games/:id/ships', async (req, res) => {
     const { pool } = require('../db/connection.js');
     await pool.query('DELETE FROM ships WHERE game_id = $1 AND player_id = $2', [game.id, player.id]);
     await placeShips(game.id, player.id, ships);
+    // Match production /place: when everyone has placed, game becomes active (Checkpoint B fire tests).
+    if (await allPlayersPlaced(game.id)) {
+      await setGameStatus(game.id, 'active');
+    }
     return res.status(200).json({ placed: true });
   } catch (err) {
     console.error(err);
