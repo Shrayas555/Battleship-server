@@ -234,6 +234,9 @@ async function executeFireInTransaction(gameId, playerId, row, col) {
         }
         await client.query('UPDATE games SET status = $1 WHERE id = $2', ['active', gameId]);
         game.status = 'active';
+      } else if (game.status === 'finished') {
+        await client.query('ROLLBACK');
+        return { ok: false, status: 409, error: 'Game finished' };
       } else {
         await client.query('ROLLBACK');
         return { ok: false, status: 403, error: 'Game not active' };
